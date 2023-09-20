@@ -6,6 +6,7 @@ from tkinter import ttk
 import win32com.client
 import tkinter as tk
 
+
 '''
 点击运行 填写名称和url 
 内容格式[hh：MM：ss@content|hh：MM：ss@content|...] 
@@ -36,7 +37,8 @@ def read_file():
 AND_JOIN = '&'
 OR_JOIN = '|'
 AI_JOIN = '@'
-CHINESE_COLON_JOIN = '：'
+CHINESE_COLON_JOIN='：'
+ENGLISH_COLON_JOIN = ':'
 
 HISTORY_FILE_PATH = './history.txt'
 
@@ -44,6 +46,20 @@ BASE_DIR_PATH = "D:/onedrive/桌面/word_bilibili/"
 
 _WELCOME_MESSAGE = "欢迎来到SmartScreenshot"
 _PROCESS_ERROR_MESSAGE = "提交出错，请重试！"
+
+
+def count_file_lines(filename) -> int:
+    cnt = 0
+    with open(filename, "r", encoding="utf-8") as fp:
+        for _ in fp:
+            cnt += 1
+    return cnt
+
+
+def read_file_lines(filename) -> []:
+    with open(filename, "r", encoding="utf-8") as fp:
+        lines = fp.readlines()
+    return lines
 
 
 def read_content(content):
@@ -57,27 +73,28 @@ def read_content(content):
     comment = []
     for c in content:
         c = c.split(small_split)
+        c[0]=c[0].replace(CHINESE_COLON_JOIN, ENGLISH_COLON_JOIN)
         screenshot_times.append(c[0])
         comment.append(c[1])
     # make times to screenshot
     times_in_second = []
     for t in screenshot_times:
-        cnt_for_maohao = 0
+        cnt_colon = 0
         for i in t:
-            if i == '：':
-                cnt_for_maohao += 1
-        if (cnt_for_maohao == 2):
+            if i == ENGLISH_COLON_JOIN:
+                cnt_colon += 1
+        if (cnt_colon == 2):
             # time
-            hour = t[:t.find(CHINESE_COLON_JOIN)]
-            minute = t[t.find(CHINESE_COLON_JOIN) + 1:t.rfind(CHINESE_COLON_JOIN)]
-            second = t[t.rfind(CHINESE_COLON_JOIN) + 1:]
+            hour = t[:t.find(ENGLISH_COLON_JOIN)]
+            minute = t[t.find(ENGLISH_COLON_JOIN) + 1:t.rfind(ENGLISH_COLON_JOIN)]
+            second = t[t.rfind(ENGLISH_COLON_JOIN) + 1:]
 
             atime = int(hour) * 3600 + int(minute) * 60 + int(second)
             print(atime)
             times_in_second.append(atime)
-        elif cnt_for_maohao == 1:
-            minute = t[:t.rfind(CHINESE_COLON_JOIN)]
-            second = t[t.rfind(CHINESE_COLON_JOIN) + 1:]
+        elif cnt_colon == 1:
+            minute = t[:t.rfind(ENGLISH_COLON_JOIN)]
+            second = t[t.rfind(ENGLISH_COLON_JOIN) + 1:]
 
             atime = int(minute) * 60 + int(second)
             times_in_second.append(atime)
@@ -116,6 +133,7 @@ def exec_you_get(u, p):
 
 
 def process_sss(video_name, url_path, content, progress_bar, _l_error_msg, base):
+    # 进度条 10
     progress = progress_bar["value"]
 
     # video_name, url_path, content = read_file()
@@ -123,6 +141,7 @@ def process_sss(video_name, url_path, content, progress_bar, _l_error_msg, base)
     try:
         # you-get
         exec_you_get(url_path, video_path)
+        # you-get 结束 进度条+20 共30
         progress += 20
         progress_bar["value"] = progress
         progress_bar.update()
@@ -135,9 +154,8 @@ def process_sss(video_name, url_path, content, progress_bar, _l_error_msg, base)
         return
     # app
     app = win32com.client.Dispatch("Word.Application")
-    # app.visible=1
     doc = init_docx(app, video_name)
-
+    # 初始化word结束 进度条+10 共40
     progress += 10
     progress_bar["value"] = progress
     progress_bar.update()
@@ -159,11 +177,17 @@ def process_sss(video_name, url_path, content, progress_bar, _l_error_msg, base)
         # 3）添加新的段落
         para_range = add_text_in_para(doc, i, len(comment), comment)
         img_file = os.path.join(os.path.abspath(os.path.curdir), img_file)
+        if not os.path.exists(img_file):
+            progress_bar["value"] = 0
+            progress_bar.update()
+            _l_error_msg.grid(row=base + 4, column=2)
+            return
         # 在当前的段落中插入图片
         para_range.InlineShapes.AddPicture(img_file)
         os.remove(img_file)
+        # 进度条更新 每成功一个+5 卡到最后的90就停止
         if progress <= 89:
-            progress += 10
+            progress += 5
             progress_bar["value"] = progress
             progress_bar.update()
     # 保存文档
@@ -172,9 +196,15 @@ def process_sss(video_name, url_path, content, progress_bar, _l_error_msg, base)
     app.Quit()
     # 删除视频
     os.remove(video_path)
-
+    # 删除you-get的附加弹幕文件
+    for fn in os.listdir("./"):
+        if fn.endswith(".cmt.xml"):
+            os.remove("./"+fn)
+    # 结束时 进度条就是100
     progress_bar["value"] = 100
     progress_bar.update()
+    _l_error_msg.grid_remove()
+
 
 
 def _clear_text(*args):
@@ -190,7 +220,7 @@ def _check_(_e_name, _e_url, _e_content) -> bool:
     return True
 
 
-def _save_text(_e_name, _e_url, _e_content):
+def _save(_e_name, _e_url, _e_content):
     if not _check_(_e_name, _e_url, _e_content): return
     list = [_e_name.get(), _e_url.get(), _e_content.get().replace("\n", "")]
     line = AND_JOIN.join(list)
@@ -199,21 +229,7 @@ def _save_text(_e_name, _e_url, _e_content):
         fp.write('\n')
 
 
-def count_file_lines(filename) -> int:
-    cnt = 0
-    with open(filename, "r", encoding="utf-8") as fp:
-        for _ in fp:
-            cnt += 1
-    return cnt
-
-
-def read_file_lines(filename) -> []:
-    with open(filename, "r", encoding="utf-8") as fp:
-        lines = fp.readlines()
-    return lines
-
-
-def _text_history(filename, _lb_show_history, base_row, offset):
+def _show_history(filename, _lb_show_history, base_row, offset):
     # show
     _lb_show_history.grid(row=base_row + offset, column=0)
     # compare the lines count
@@ -224,19 +240,20 @@ def _text_history(filename, _lb_show_history, base_row, offset):
     # lines = read_file_lines(filename)
     # for i in range(len(lines) - lbls):
     #     _lb_show_history.insert(0, lines[i + lbls])
-    with open(filename,"r",encoding="utf-8")as fp:
+    with open(filename, "r", encoding="utf-8") as fp:
         cnt = 0
         for line in fp:
             cnt += 1
             if cnt > lbls:
                 _lb_show_history.insert(0, line)
 
+
 def _hide_history(_lb_show_history):
     _lb_show_history.grid_remove()
     # _lb_show_history.delete(0, tk.END)
 
 
-def _choose_text(_lb_show_history, _e_name, _e_url, _e_content):
+def _choose_listbox_item(_lb_show_history, _e_name, _e_url, _e_content):
     # no choose
     if len(_lb_show_history.curselection()) == 0: return
 
@@ -253,7 +270,7 @@ def _choose_text(_lb_show_history, _e_name, _e_url, _e_content):
     _e_content.insert(0, lb_item_list[2])
 
 
-def _init_gui():
+def _init_ui():
     _window = tk.Tk()
     _window.wm_title("smart screenshot @copyright 2023.9-2024 by Demouo")
     base_row = 1
@@ -292,6 +309,8 @@ def _init_gui():
             return
         _progress_bar["value"] = 10
         _progress_bar.update()
+        # save the input
+        _save(_e_name,_e_url,_e_content)
         # 创建一个守护进程来执行任务，并传递进度条
         threading.Thread(target=process_sss,
                          args=(name.get(), url.get(), content.get(), _progress_bar, _l_error_msg, base_row),
@@ -312,19 +331,19 @@ def _init_gui():
     _f_b_2.grid(row=base_row + 4, column=0)
     _b_clear = tk.Button(_f_b_2, text="隐藏", command=lambda: _hide_history(_lb_show_history))
     _b_clear.grid(row=base_row + 4, column=1)
-    _b_save = tk.Button(_f_b_2, text="保存", command=lambda: _save_text(_e_name, _e_url, _e_content))
+    _b_save = tk.Button(_f_b_2, text="保存", command=lambda: _save(_e_name, _e_url, _e_content))
     _b_save.grid(row=base_row + 4, column=2)
     _b_history = tk.Button(_f_b_2, text="历史",
-                           command=lambda: _text_history(HISTORY_FILE_PATH, _lb_show_history, base_row, 5))
+                           command=lambda: _show_history(HISTORY_FILE_PATH, _lb_show_history, base_row, 5))
     _b_history.grid(row=base_row + 4, column=0)
 
     _lb_show_history = tk.Listbox(_window)
 
     # 绑定Listbox的选择事件
     _lb_show_history.bind("<<ListboxSelect>>",
-                          lambda event: _choose_text(_lb_show_history, _e_name, _e_url, _e_content))
+                          lambda event: _choose_listbox_item(_lb_show_history, _e_name, _e_url, _e_content))
     _window.mainloop()
 
 
 if __name__ == '__main__':
-    _init_gui()
+    _init_ui()
