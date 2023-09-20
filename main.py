@@ -6,7 +6,6 @@ from tkinter import ttk
 import win32com.client
 import tkinter as tk
 
-# TODO 添加or保存历史输入
 '''
 点击运行 填写名称和url 
 内容格式[hh：MM：ss@content|hh：MM：ss@content|...] 
@@ -222,11 +221,15 @@ def _text_history(filename, _lb_show_history, base_row, offset):
     lbls = _lb_show_history.size()
     if fls <= lbls:
         return
-    # TODO update read the 10th line's approach
-    lines = read_file_lines(filename)
-    for i in range(len(lines) - lbls):
-        _lb_show_history.insert(0, lines[i + lbls])
-
+    # lines = read_file_lines(filename)
+    # for i in range(len(lines) - lbls):
+    #     _lb_show_history.insert(0, lines[i + lbls])
+    with open(filename,"r",encoding="utf-8")as fp:
+        cnt = 0
+        for line in fp:
+            cnt += 1
+            if cnt > lbls:
+                _lb_show_history.insert(0, line)
 
 def _hide_history(_lb_show_history):
     _lb_show_history.grid_remove()
