@@ -6,7 +6,6 @@ from tkinter import ttk
 import win32com.client
 import tkinter as tk
 
-
 '''
 点击运行 填写名称和url 
 内容格式[hh：MM：ss@content|hh：MM：ss@content|...] 
@@ -33,11 +32,10 @@ def read_file():
     content = lines[2]
     return name, url_path, content
 """
-
-AND_JOIN = '&'
+DOLLAR_JOIN = '$'
 OR_JOIN = '|'
 AI_JOIN = '@'
-CHINESE_COLON_JOIN='：'
+CHINESE_COLON_JOIN = '：'
 ENGLISH_COLON_JOIN = ':'
 
 HISTORY_FILE_PATH = './history.txt'
@@ -46,6 +44,9 @@ BASE_DIR_PATH = "D:/onedrive/桌面/word_bilibili/"
 
 _WELCOME_MESSAGE = "欢迎来到SmartScreenshot"
 _PROCESS_ERROR_MESSAGE = "提交出错，请重试！"
+
+base_row = 0
+base_column = 0
 
 
 def count_file_lines(filename) -> int:
@@ -73,7 +74,7 @@ def read_content(content):
     comment = []
     for c in content:
         c = c.split(small_split)
-        c[0]=c[0].replace(CHINESE_COLON_JOIN, ENGLISH_COLON_JOIN)
+        c[0] = c[0].replace(CHINESE_COLON_JOIN, ENGLISH_COLON_JOIN)
         screenshot_times.append(c[0])
         comment.append(c[1])
     # make times to screenshot
@@ -150,7 +151,7 @@ def process_sss(video_name, url_path, content, progress_bar, _l_error_msg, base)
     except:
         progress_bar["value"] = 0
         progress_bar.update()
-        _l_error_msg.grid(row=base + 4, column=2)
+        _l_error_msg.grid(row=base + 4, column=3)
         return
     # app
     app = win32com.client.Dispatch("Word.Application")
@@ -178,9 +179,10 @@ def process_sss(video_name, url_path, content, progress_bar, _l_error_msg, base)
         para_range = add_text_in_para(doc, i, len(comment), comment)
         img_file = os.path.join(os.path.abspath(os.path.curdir), img_file)
         if not os.path.exists(img_file):
+            print("文件不存在阿！！")
             progress_bar["value"] = 0
             progress_bar.update()
-            _l_error_msg.grid(row=base + 4, column=2)
+            _l_error_msg.grid(row=base + 4, column=3)
             return
         # 在当前的段落中插入图片
         para_range.InlineShapes.AddPicture(img_file)
@@ -191,7 +193,8 @@ def process_sss(video_name, url_path, content, progress_bar, _l_error_msg, base)
             progress_bar["value"] = progress
             progress_bar.update()
     # 保存文档
-    doc.SaveAs(BASE_DIR_PATH + video_name + ".docx")
+    output_file_path = BASE_DIR_PATH + video_name + ".docx"
+    doc.SaveAs(output_file_path)
     # 关闭Word应用程序
     app.Quit()
     # 删除视频
@@ -199,17 +202,22 @@ def process_sss(video_name, url_path, content, progress_bar, _l_error_msg, base)
     # 删除you-get的附加弹幕文件
     for fn in os.listdir("./"):
         if fn.endswith(".cmt.xml"):
-            os.remove("./"+fn)
+            os.remove("./" + fn)
     # 结束时 进度条就是100
     progress_bar["value"] = 100
     progress_bar.update()
     _l_error_msg.grid_remove()
-
+    output_file_path = output_file_path.replace("/", "\\")
+    subprocess.Popen(r'explorer /select,"{}"'.format(output_file_path))
 
 
 def _clear_text(*args):
-    for _ in args:
-        _.delete(0, tk.END)
+    for k in args:
+        if isinstance(k, list):
+            for i in k:
+                i.delete(0, tk.END)
+        else:
+            k.delete(0, tk.END)
 
 
 def _check_(_e_name, _e_url, _e_content) -> bool:
@@ -220,10 +228,8 @@ def _check_(_e_name, _e_url, _e_content) -> bool:
     return True
 
 
-def _save(_e_name, _e_url, _e_content):
-    if not _check_(_e_name, _e_url, _e_content): return
-    list = [_e_name.get(), _e_url.get(), _e_content.get().replace("\n", "")]
-    line = AND_JOIN.join(list)
+def _save(name, url, content):
+    line = name + DOLLAR_JOIN + url + DOLLAR_JOIN + content
     with open(HISTORY_FILE_PATH, "a", encoding="utf-8") as fp:
         fp.write(line)
         fp.write('\n')
@@ -231,15 +237,12 @@ def _save(_e_name, _e_url, _e_content):
 
 def _show_history(filename, _lb_show_history, base_row, offset):
     # show
-    _lb_show_history.grid(row=base_row + offset, column=0)
+    _lb_show_history.grid(row=base_row + offset, column=0, rowspan=5)
     # compare the lines count
     fls = count_file_lines(filename)
     lbls = _lb_show_history.size()
     if fls <= lbls:
         return
-    # lines = read_file_lines(filename)
-    # for i in range(len(lines) - lbls):
-    #     _lb_show_history.insert(0, lines[i + lbls])
     with open(filename, "r", encoding="utf-8") as fp:
         cnt = 0
         for line in fp:
@@ -253,95 +256,175 @@ def _hide_history(_lb_show_history):
     # _lb_show_history.delete(0, tk.END)
 
 
-def _choose_listbox_item(_lb_show_history, _e_name, _e_url, _e_content):
+def _choose_listbox_item(_lb_show_history, _e_name, _e_url, _e_time_list,
+                         _e_content_list, _window):
     # no choose
     if len(_lb_show_history.curselection()) == 0: return
 
     lb_item = _lb_show_history.get(
         _lb_show_history.curselection()[0])
-    lb_item_list = lb_item.split(AND_JOIN)
+    lb_item_list = lb_item.split(DOLLAR_JOIN)
     if len(lb_item_list) < 3: return
 
     _e_name.delete(0, tk.END)
     _e_name.insert(0, lb_item_list[0])
     _e_url.delete(0, tk.END)
     _e_url.insert(0, lb_item_list[1])
-    _e_content.delete(0, tk.END)
-    _e_content.insert(0, lb_item_list[2])
+    # for content
+    content = lb_item_list[2].split(OR_JOIN)
+    c_size = len(content)
+    _e_size = len(_e_time_list)
+    if c_size > _e_size:
+        #     add entry
+        for i in range(c_size - _e_size):
+            _e_time_list.append(tk.Entry(_window))
+            _e_content_list.append(tk.Entry(_window))
+            # show
+            _e_time_list[i + _e_size].grid(row=base_row + _e_size + i + 3, column=base_column + 1)
+            _e_content_list[i + _e_size].grid(row=base_row + _e_size + i + 3, column=base_column + 2)
+    elif c_size < _e_size:
+        # delete more list item
+        for i in range(_e_size - c_size):
+            _e_time_list[c_size].destroy()
+            _e_content_list[c_size].destroy()
+            _e_time_list.pop(c_size)
+            _e_content_list.pop(c_size)
+
+    # show
+    for i in range(len(content)):
+        t_c = content[i].split(AI_JOIN)
+        t = t_c[0]
+        c = t_c[1]
+        _e_time_list[i].delete(0, tk.END)
+        _e_time_list[i].insert(0, t)
+        _e_content_list[i].delete(0, tk.END)
+        _e_content_list[i].insert(0, c)
+
+
+def concat_time_content(_e_time_list, e_content_list):
+    line = ""
+    for i in range(len(_e_time_list)):
+        c = e_content_list[i].get()
+        if c == "":
+            continue
+        t = _e_time_list[i].get()
+        line += ("" if i == 0 else "|") + t + "@" + c
+    return line
+
+
+def _explore_output():
+    subprocess.Popen(r'explorer /select,"{}"'.format("D:\onedrive\桌面\word_bilibili\猫猫.docx"))
+
+
+def add_one_entry(_window, _e_time_list, _e_content_list):
+    old_size = len(_e_time_list)
+    _e_time_list.append(tk.Entry(_window))
+    _e_content_list.append(tk.Entry(_window))
+    # show
+    _e_time_list[old_size].grid(row=base_row + old_size + 3, column=base_column + 1)
+    _e_content_list[old_size].grid(row=base_row + old_size + 3, column=base_column + 2)
+
+    _e_content_list[old_size-1].unbind("<KeyPress>")
+    _e_content_list[old_size].bind("<KeyPress>", lambda e:add_one_entry(_window, _e_time_list, _e_content_list))
 
 
 def _init_ui():
     _window = tk.Tk()
     _window.wm_title("smart screenshot @copyright 2023.9-2024 by Demouo")
-    base_row = 1
-    _l_welcome = tk.Label(_window, text=_WELCOME_MESSAGE)
-    _l_welcome.grid(row=base_row - 1, column=1)
 
-    name = tk.StringVar()
-    url = tk.StringVar()
-    content = tk.StringVar()
+    # 创建一个进度条
+    _progress_bar = ttk.Progressbar(_window, orient="horizontal", length=150, mode="determinate")
+    _progress_bar.grid(row=base_row + 1, column=base_column + 3)
+    # 显示输出路径
+    _l_save_path = tk.Label(_window, text="> " + BASE_DIR_PATH)
+    _l_save_path.grid(row=base_row, column=base_column + 3)
 
     text = "请输入名称"
     _l_name = tk.Label(_window, text=text)
-    _e_name = tk.Entry(_window, textvariable=name)
-    _l_name.grid(row=base_row, column=0)
-    _e_name.grid(row=base_row, column=1)
+    _e_name = tk.Entry(_window)
+    _l_name.grid(row=base_row, column=base_column)
+    _e_name.grid(row=base_row, column=base_column + 1)
 
     text = "请输入网址"
     _l_url = tk.Label(_window, text=text)
-    _e_url = tk.Entry(_window, textvariable=url)
-    _l_url.grid(row=base_row + 1, column=0)
-    _e_url.grid(row=base_row + 1, column=1)
+    _e_url = tk.Entry(_window)
+    _l_url.grid(row=base_row + 1, column=base_column)
+    _e_url.grid(row=base_row + 1, column=base_column + 1)
 
     text = "请输入内容"
     _l_content = tk.Label(_window, text=text)
-    _e_content = tk.Entry(_window, textvariable=content)
-    _l_content.grid(row=base_row + 2, column=0)
-    _e_content.grid(row=base_row + 2, column=1)
+    _l_content.grid(row=base_row + 2, column=base_column)
+    text = "时间"
+    _l_time = tk.Label(_window, text=text)
+    _l_time.grid(row=base_row + 2, column=base_column + 1)
+    text = "备注"
+    _l_time = tk.Label(_window, text=text)
+    _l_time.grid(row=base_row + 2, column=base_column + 2)
+    # 默认 五个 输入内容
+    cnt_entry: int = 1
+    # 时间entry列表
+    _e_time_list = []
+    # 内容entry列表
+    _e_content_list = []
+    # 生成并组织entry
+    for i in range(cnt_entry - len(_e_time_list)):
+        _e_time_list.append(tk.Entry(_window))
+        _e_content_list.append(tk.Entry(_window))
+        # show
+        _e_time_list[i].grid(row=base_row + i + 3, column=base_column + 1)
+        _e_content_list[i].grid(row=base_row + i + 3, column=base_column + 2)
+    _e_content_list[len(_e_time_list)-1].bind("<KeyPress>", lambda e:add_one_entry(_window, _e_time_list, _e_content_list))
 
-    # 创建一个进度条并放在底部
-    _progress_bar = ttk.Progressbar(_window, orient="horizontal", length=150, mode="determinate")
-    _progress_bar.grid(row=base_row + 3, column=1)
-
+    # 提交激活
     def start_process():
-        if not _check_(_e_name, _e_url, _e_content):
-            _l_error_msg.grid(row=base_row + 4, column=2)
-            return
+        # if not _check_(_e_name, _e_url, _e_content):
+        #     _l_error_msg.grid(row=base_row + 4, column=base_column + 3)
+        #     return
         _progress_bar["value"] = 10
         _progress_bar.update()
+        content = concat_time_content(_e_time_list, _e_content_list)
         # save the input
-        _save(_e_name,_e_url,_e_content)
+        _save(_e_name.get(), _e_url.get(), content)
         # 创建一个守护进程来执行任务，并传递进度条
         threading.Thread(target=process_sss,
-                         args=(name.get(), url.get(), content.get(), _progress_bar, _l_error_msg, base_row),
+                         args=(
+                             _e_name.get(), _e_url.get(), content,
+                             _progress_bar,
+                             _l_error_msg, base_row),
                          daemon=True).start()
 
     # err msg
     _l_error_msg = tk.Label(_window, text=_PROCESS_ERROR_MESSAGE)
     _l_error_msg.grid_remove()
-
+    # 按钮集合1
     _f_b_1 = tk.Frame(_window)
-    _f_b_1.grid(row=base_row + 4, column=1)
+    _f_b_1.grid(row=base_row + 2, column=base_column + 3)
+    _b_explore = tk.Button(_f_b_1, text="浏览", command=_explore_output)
+    _b_explore.grid(row=base_row + 4, column=base_column + 1)
     _b_commit = tk.Button(_f_b_1, text="提交", command=start_process)
-    _b_commit.grid(row=base_row + 4, column=1)
-    _b_clear_input = tk.Button(_f_b_1, text="清空", command=lambda: _clear_text(_e_name, _e_url, _e_content))
-    _b_clear_input.grid(row=base_row + 4, column=0)
-
+    _b_commit.grid(row=base_row + 4, column=base_column + 2)
+    _b_clear_input = tk.Button(_f_b_1, text="清空",
+                               command=lambda: _clear_text(_e_name, _e_url, _e_time_list, _e_content_list))
+    _b_clear_input.grid(row=base_row + 4, column=base_column)
+    # 按钮集合2
     _f_b_2 = tk.Frame(_window)
-    _f_b_2.grid(row=base_row + 4, column=0)
+    _f_b_2.grid(row=base_row + 4, column=base_column)
     _b_clear = tk.Button(_f_b_2, text="隐藏", command=lambda: _hide_history(_lb_show_history))
-    _b_clear.grid(row=base_row + 4, column=1)
-    _b_save = tk.Button(_f_b_2, text="保存", command=lambda: _save(_e_name, _e_url, _e_content))
-    _b_save.grid(row=base_row + 4, column=2)
+    _b_clear.grid(row=base_row + 4, column=base_column + 1)
+    _b_save = tk.Button(_f_b_2, text="保存",
+                        command=lambda: _save(_e_name.get(), _e_url.get(),
+                                              concat_time_content(_e_time_list, _e_content_list)))
+    _b_save.grid(row=base_row + 4, column=base_column + 2)
     _b_history = tk.Button(_f_b_2, text="历史",
                            command=lambda: _show_history(HISTORY_FILE_PATH, _lb_show_history, base_row, 5))
-    _b_history.grid(row=base_row + 4, column=0)
+    _b_history.grid(row=base_row + 4, column=base_column)
 
-    _lb_show_history = tk.Listbox(_window)
+    _lb_show_history = tk.Listbox(_window, height=5)
 
     # 绑定Listbox的选择事件
     _lb_show_history.bind("<<ListboxSelect>>",
-                          lambda event: _choose_listbox_item(_lb_show_history, _e_name, _e_url, _e_content))
+                          lambda event: _choose_listbox_item(_lb_show_history, _e_name, _e_url,
+                                                             _e_time_list, _e_content_list, _window))
     _window.mainloop()
 
 
