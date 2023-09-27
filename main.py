@@ -40,7 +40,7 @@ ENGLISH_COLON_JOIN = ':'
 
 HISTORY_FILE_PATH = './history.txt'
 
-BASE_DIR_PATH = "D:/onedrive/桌面/word_bilibili/"
+BASE_DIR_PATH = "D:/onedrive/桌面/大三上活动/2_家教/数学/"
 
 _WELCOME_MESSAGE = "欢迎来到SmartScreenshot"
 _PROCESS_ERROR_MESSAGE = "提交出错，请重试！"
@@ -183,7 +183,7 @@ def process_sss(video_name, url_path, content, progress_bar, _l_error_msg, base)
             progress_bar["value"] = 0
             progress_bar.update()
             _l_error_msg.grid(row=base + 4, column=3)
-            return
+            continue
         # 在当前的段落中插入图片
         para_range.InlineShapes.AddPicture(img_file)
         os.remove(img_file)
@@ -276,7 +276,7 @@ def _choose_listbox_item(_lb_show_history, _e_name, _e_url, _e_time_list,
     _e_size = len(_e_time_list)
     if c_size > _e_size:
         #     add entry
-        for i in range(c_size - _e_size):
+        for i in range(c_size - _e_size+1):
             _e_time_list.append(tk.Entry(_window))
             _e_content_list.append(tk.Entry(_window))
             # show
@@ -284,11 +284,11 @@ def _choose_listbox_item(_lb_show_history, _e_name, _e_url, _e_time_list,
             _e_content_list[i + _e_size].grid(row=base_row + _e_size + i + 3, column=base_column + 2)
     elif c_size < _e_size:
         # delete more list item
-        for i in range(_e_size - c_size):
-            _e_time_list[c_size].destroy()
-            _e_content_list[c_size].destroy()
-            _e_time_list.pop(c_size)
-            _e_content_list.pop(c_size)
+        for i in range(_e_size - c_size-1):
+            _e_time_list[_e_size-1-i].destroy()
+            _e_content_list[_e_size-1-i].destroy()
+            _e_time_list.pop(_e_size-1-i)
+            _e_content_list.pop(_e_size-1-i)
 
     # show
     for i in range(len(content)):
@@ -299,6 +299,11 @@ def _choose_listbox_item(_lb_show_history, _e_name, _e_url, _e_time_list,
         _e_time_list[i].insert(0, t)
         _e_content_list[i].delete(0, tk.END)
         _e_content_list[i].insert(0, c)
+    # clear the last to input
+    _e_time_list[len(_e_time_list)-1].delete(0,tk.END)
+    _e_content_list[len(_e_content_list) - 1].delete(0, tk.END)
+    # add the listener to the last content
+    _e_content_list[len(_e_content_list)-1].bind("<KeyPress>", lambda e: add_one_entry(_window, _e_time_list, _e_content_list))
 
 
 def concat_time_content(_e_time_list, e_content_list):
@@ -361,7 +366,7 @@ def _init_ui():
     _l_time = tk.Label(_window, text=text)
     _l_time.grid(row=base_row + 2, column=base_column + 2)
     # 默认 五个 输入内容
-    cnt_entry: int = 1
+    cnt_entry: int = 3
     # 时间entry列表
     _e_time_list = []
     # 内容entry列表
